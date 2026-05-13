@@ -1,10 +1,14 @@
 mod features;
 mod model;
 mod classifier;
+mod server;
 
+use std::sync::Arc;
 use classifier::DnsTemplar;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+use tracing_appender::rolling;
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[derive(Parser)]
 #[command(name = "dns-templar")]
@@ -20,6 +24,8 @@ struct Cli {
     tld_freq: PathBuf,
     #[arg(long, default_value = "../models/whitelist.txt")]
     whitelist: PathBuf,
+    #[arg(long, default_value = "../logs")]
+    log_dir: PathBuf,
 
     #[command(subcommand)]
     command: Command,
@@ -41,10 +47,34 @@ enum Command {
         #[arg(long, help = "Override classification threshold (0.0-1.0)")]
         threshold: Option<f32>,
     },
+    Serve {
+        #[arg(long, default_value = "0.0.0.0:53")]
+        listen: String,
+        #[arg(long, default_value = "127.0.0.1:5353")]
+        upstream: String,
+        #[arg(long)]
+        threshold: Option<f32>,
+
+    },
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn init_logging(log_dir: &str) -> tracing_appender::non_blocking::WorkerGuard {
+    let file_appender = rolling::daily(log_dir, "dns-templar.log");
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env().add_directive("info".parse().unwrap()))
+        .with(fmt::layer().with_writer(std::io::stderr))
+        .with(fmt::layer().json().with_writer(non_blocking))
+        .init();
+
+    guard
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+    let _guard = init_logging(cli.log_dir.to_str().unwrap());
 
     let templar = DnsTemplar::load(
         cli.model.to_str().unwrap(),
@@ -53,6 +83,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cli.tld_freq.to_str().unwrap(),
         cli.whitelist.to_str().unwrap(),
     )?;
+
+    let _ = templar.classify("warmup.internal", None);
+    tracing::info!("model warmed up");
 
     match cli.command {
         Command::Check { domain, explain, threshold } => {
@@ -67,6 +100,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        Command::Serve { listen, upstream, threshold } => {
+            let templar = Arc::new(templar);
+            server::serve(&listen, &upstream, templar, threshold).await?;
+        }
     }
 
     Ok(())
@@ -80,6 +117,14 @@ fn classify_and_print(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let verdict = templar.classify(domain, threshold_override)?;
     
+    tracing::info!(
+        domain = %verdict.domain,
+        probability = verdict.probability,
+        is_dga = verdict.is_dga,
+        whitelisted = verdict.whitelisted,
+        "classified"
+    );
+
     let label = if verdict.whitelisted {
         "SAFE "
     } else if verdict.is_dga {

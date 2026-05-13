@@ -46,7 +46,7 @@ impl DnsTemplar {
     }
 
     pub fn classify(&self, domain: &str, threshold_override: Option<f32>) -> Result<Verdict, Box<dyn std::error::Error>> {
-        let domain_lower = domain.to_lowercase();
+        let domain_lower = domain.trim_end_matches('.').to_lowercase();
         
         if self.whitelist.contains(&domain_lower) {
             return Ok(Verdict {
