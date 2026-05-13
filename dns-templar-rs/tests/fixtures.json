@@ -1,0 +1,93 @@
+[
+  {
+    "domain": "google.com",
+    "hostname": "google",
+    "entropy": 1.9182958340544893,
+    "digit_ratio": 0.0,
+    "vowel_ratio": 0.5,
+    "unique_char_ratio": 0.6666666666666666,
+    "longest_consonant_run": 2,
+    "dot_count": 1,
+    "has_hyphen": 0,
+    "tld": "com",
+    "ngram_score": -9.028974727835326
+  },
+  {
+    "domain": "ymvpdgmplptkaommi.tw",
+    "hostname": "ymvpdgmplptkaommi",
+    "entropy": 3.337175341123077,
+    "digit_ratio": 0.0,
+    "vowel_ratio": 0.17647058823529413,
+    "unique_char_ratio": 0.7058823529411765,
+    "longest_consonant_run": 12,
+    "dot_count": 1,
+    "has_hyphen": 0,
+    "tld": "tw",
+    "ngram_score": -11.318774781167608
+  },
+  {
+    "domain": "horsepressurecalculatedeliver.com",
+    "hostname": "horsepressurecalculatedeliver",
+    "entropy": 3.5124792706912316,
+    "digit_ratio": 0.0,
+    "vowel_ratio": 0.41379310344827586,
+    "unique_char_ratio": 0.4827586206896552,
+    "longest_consonant_run": 2,
+    "dot_count": 1,
+    "has_hyphen": 0,
+    "tld": "com",
+    "ngram_score": -7.653453301335447
+  },
+  {
+    "domain": "cmfggfkte.com.sv",
+    "hostname": "cmfggfkte.com",
+    "entropy": 3.0850551027564768,
+    "digit_ratio": 0.0,
+    "vowel_ratio": 0.15384615384615385,
+    "unique_char_ratio": 0.6923076923076923,
+    "longest_consonant_run": 8,
+    "dot_count": 2,
+    "has_hyphen": 0,
+    "tld": "sv",
+    "ngram_score": -10.32589191353565
+  },
+  {
+    "domain": "fmspuxrs7i8sfi8osd.biz",
+    "hostname": "fmspuxrs7i8sfi8osd",
+    "entropy": 3.3921472236645345,
+    "digit_ratio": 0.16666666666666666,
+    "vowel_ratio": 0.2222222222222222,
+    "unique_char_ratio": 0.6666666666666666,
+    "longest_consonant_run": 4,
+    "dot_count": 1,
+    "has_hyphen": 0,
+    "tld": "biz",
+    "ngram_score": -15.388279126660176
+  },
+  {
+    "domain": "wideworld-sports.me",
+    "hostname": "wideworld-sports",
+    "entropy": 3.375,
+    "digit_ratio": 0.0,
+    "vowel_ratio": 0.25,
+    "unique_char_ratio": 0.6875,
+    "longest_consonant_run": 3,
+    "dot_count": 1,
+    "has_hyphen": 1,
+    "tld": "me",
+    "ngram_score": -8.015256890246166
+  },
+  {
+    "domain": "otleawfaufex.ddns.net",
+    "hostname": "otleawfaufex.ddns",
+    "entropy": 3.6168746059562227,
+    "digit_ratio": 0.0,
+    "vowel_ratio": 0.35294117647058826,
+    "unique_char_ratio": 0.7647058823529411,
+    "longest_consonant_run": 4,
+    "dot_count": 2,
+    "has_hyphen": 0,
+    "tld": "net",
+    "ngram_score": -10.452642710007046
+  }
+]
