@@ -5,17 +5,20 @@ use crate::features::{
     load_ngram_table, load_tld_freq, NgramTable, TldFreqMap,
 };
 use crate::model::Classifier;
+use std::collections::HashSet;
 
 pub struct DnsTemplar {
     classifier: Classifier,
     ngram_table: NgramTable,
     tld_freq: TldFreqMap,
+    whitelist: HashSet<String>,
 }
 
 pub struct Verdict {
     pub domain: String,
     pub probability: f32,
     pub is_dga: bool,
+    pub whitelisted: bool,
     pub features: Vec<(&'static str, f64)>,
 }
 
@@ -25,16 +28,36 @@ impl DnsTemplar {
         threshold_path: &str,
         ngram_path: &str,
         tld_freq_path: &str,
+        whitelist_path: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let classifier = Classifier::load(model_path, threshold_path)?;
         let ngram_table = load_ngram_table(ngram_path)?;
         let tld_freq = load_tld_freq(tld_freq_path)?;
 
-        Ok(Self { classifier, ngram_table, tld_freq })
+        let whitelist_raw = std::fs::read_to_string(whitelist_path)?;
+        let whitelist: HashSet<String> = whitelist_raw
+            .lines()
+            .map(|l| l.trim().to_lowercase())
+            .filter(|l| !l.is_empty())
+            .collect();
+        println!("Loaded {} whitelisted domains", whitelist.len());
+
+        Ok(Self { classifier, ngram_table, tld_freq, whitelist })
     }
 
-    pub fn classify(&self, domain: &str) -> Result<Verdict, Box<dyn std::error::Error>> {
+    pub fn classify(&self, domain: &str, threshold_override: Option<f32>) -> Result<Verdict, Box<dyn std::error::Error>> {
         let domain_lower = domain.to_lowercase();
+        
+        if self.whitelist.contains(&domain_lower) {
+            return Ok(Verdict {
+                domain: domain.to_string(),
+                probability: 0.0,
+                is_dga: false,
+                whitelisted: true,
+                features: vec![],
+            });
+        }
+        
         let hostname = extract_hostname(&domain_lower).to_string();
         let tld = extract_tld(&domain_lower).to_string();
         let tld_freq_val = self.tld_freq.get(&tld).copied().unwrap_or(0.0);
@@ -57,12 +80,15 @@ impl DnsTemplar {
             .map(|(_, v)| *v as f32)
             .collect();
 
-        let (probability, is_dga) = self.classifier.predict(&feature_vec)?;
-
+        let (probability, _) = self.classifier.predict(&feature_vec)?;
+        let threshold = threshold_override.unwrap_or(self.classifier.threshold);
+        let is_dga = probability >= threshold;
+    
         Ok(Verdict {
             domain: domain.to_string(),
             probability,
             is_dga,
+            whitelisted: false,
             features,
         })
     }

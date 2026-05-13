@@ -18,6 +18,8 @@ struct Cli {
     ngram_table: PathBuf,
     #[arg(long, default_value = "../models/tld_freq.json")]
     tld_freq: PathBuf,
+    #[arg(long, default_value = "../models/whitelist.txt")]
+    whitelist: PathBuf,
 
     #[command(subcommand)]
     command: Command,
@@ -29,11 +31,15 @@ enum Command {
         domain: String,
         #[arg(long)]
         explain: bool,
+        #[arg(long, help = "Override classification threshold (0.0-1.0)")]
+        threshold: Option<f32>,
     },
     Batch {
         file: PathBuf,
         #[arg(long)]
         explain: bool,
+        #[arg(long, help = "Override classification threshold (0.0-1.0)")]
+        threshold: Option<f32>,
     },
 }
 
@@ -45,18 +51,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cli.threshold.to_str().unwrap(),
         cli.ngram_table.to_str().unwrap(),
         cli.tld_freq.to_str().unwrap(),
+        cli.whitelist.to_str().unwrap(),
     )?;
 
     match cli.command {
-        Command::Check { domain, explain } => {
-            classify_and_print(&templar, &domain, explain)?;
+        Command::Check { domain, explain, threshold } => {
+            classify_and_print(&templar, &domain, explain, threshold)?;
         }
-        Command::Batch { file, explain } => {
+        Command::Batch { file, explain, threshold } => {
             let contents = std::fs::read_to_string(&file)?;
             for line in contents.lines() {
                 let domain = line.trim();
                 if !domain.is_empty() {
-                    classify_and_print(&templar, domain, explain)?;
+                    classify_and_print(&templar, domain, explain, threshold)?;
                 }
             }
         }
@@ -69,14 +76,27 @@ fn classify_and_print(
     templar: &DnsTemplar,
     domain: &str,
     explain: bool,
+    threshold_override: Option<f32>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let verdict = templar.classify(domain)?;
-    let label = if verdict.is_dga { "DGA  " } else { "LEGIT" };
-    let prob = verdict.probability * 100.0;
+    let verdict = templar.classify(domain, threshold_override)?;
+    
+    let label = if verdict.whitelisted {
+        "SAFE "
+    } else if verdict.is_dga {
+        "DGA"
+    } else {
+        "LEGIT"
+    };
+    
+    let prob_str = if verdict.whitelisted {
+        " -- ".to_string()
+    } else {
+        format!("{:.1}%", verdict.probability * 100.0)
+    };
 
-    println!("[{label}] {:.1}%  {}", prob, verdict.domain);
+    println!("[{label}] {prob_str}  {}", verdict.domain);
 
-    if explain {
+    if explain && !verdict.whitelisted {
         println!("  Feature contributions:");
         for (name, value) in &verdict.features {
             println!("      {:<25} {:.6}", name, value);
