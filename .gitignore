@@ -3,12 +3,6 @@ src/__pycache__/
 data/
 outputs/
 
-# Models
-models/classifier.onnx
-models/classifier.json
-models/whitelist.txt
-models/blacklist.txt
-
 # Logs
 logs/
 
