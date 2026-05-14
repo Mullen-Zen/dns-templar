@@ -73,7 +73,7 @@ The blacklist (337,500 known DGA domains from training data) catches many of the
  
 ## Installation
  
-Download the latest release for your platform from the [releases page](https://github.com/Mullen-Zen/dns-templar-rs/releases/latest):
+Download the latest release for your platform from the [releases page](https://github.com/Mullen-Zen/dns-templar/releases/latest):
  
 ```bash
 # Linux x86_64
