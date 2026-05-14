@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Mullen-Zen/dns-templar/actions/workflows/ci.yml/badge.svg)](https://github.com/Mullen-Zen/dns-templar/actions/workflows/ci.yml)
 
-[![Release](https://github.com/Mullen-Zen/dns-templar/actions/workflows/release.yml/badge.svg)](https://github.com/Mullen-Zen/dns-templar-rs/releases/latest)
+[![Release](https://github.com/Mullen-Zen/dns-templar/actions/workflows/release.yml/badge.svg)](https://github.com/Mullen-Zen/dns-templar/releases/latest)
 
 A DNS server that classifies domains in real time with an XGBoost model trained on detecting Domain Generation Algorithm (DGA) traffic. DGA domains are generated hostnames used by malware to communicate with command-and-control (C2) infrastructure. DNS Templar intercepts DNS queries, classifies each domain before resolution, and returns NXDOMAIN for suspected DGA traffic, preventing a successful connection/response.
 
