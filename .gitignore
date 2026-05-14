@@ -1,2 +1,17 @@
-*/__pycache__/
+# Python
+src/__pycache__/
+data/
+outputs/
+
+# Models
+models/
+
+# Logs
+logs/
+
+# Rust
 dns-templar-rs/target/
+dns-templar-rs/config.toml
+
+# Misc
+todo.txt

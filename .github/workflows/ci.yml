@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test
+        working-directory: dns-templar-rs
+        run: cargo test
+      - name: Clippy
+        working-directory: dns-templar-rs
+        run: cargo clippy -- -D warnings

@@ -1,0 +1,17 @@
+[model]
+classifier  = "models/classifier.onnx"
+threshold   = "models/threshold.json"
+ngram_table = "models/ngram_table.json"
+tld_freq    = "models/tld_freq.json"
+whitelist   = "models/whitelist.txt"
+blacklist   = "models/blacklist.txt"
+
+[server]
+listen   = "0.0.0.0:53"
+upstream = "127.0.0.1:5353"
+
+[logging]
+dir = "logs"
+
+# [classification]
+# threshold_override = [0.0-1.0]

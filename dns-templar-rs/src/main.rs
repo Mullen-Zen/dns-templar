@@ -3,6 +3,7 @@ mod model;
 mod classifier;
 mod server;
 mod blacklist;
+mod config;
 
 use std::sync::Arc;
 use classifier::{DnsTemplar, Tier};
@@ -10,25 +11,14 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use tracing_appender::rolling;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use config::Config;
 
 #[derive(Parser)]
 #[command(name = "dns-templar")]
 #[command(about = "ML-powered DNS classifier for DGA domain detection")]
 struct Cli {
-    #[arg(long, default_value = "../models/classifier.onnx")]
-    model: PathBuf,
-    #[arg(long, default_value = "../models/threshold.json")]
-    threshold: PathBuf,
-    #[arg(long, default_value = "../models/ngram_table.json")]
-    ngram_table: PathBuf,
-    #[arg(long, default_value = "../models/tld_freq.json")]
-    tld_freq: PathBuf,
-    #[arg(long, default_value = "../models/whitelist.txt")]
-    whitelist: PathBuf,
-    #[arg(long, default_value = "../logs")]
-    log_dir: PathBuf,
-    #[arg(long, default_value = "../models/blacklist.txt")]
-    blacklist: PathBuf,
+    #[arg(long, default_value = "/etc/dns-templar/config.toml")]
+    config: PathBuf,
 
     #[command(subcommand)]
     command: Command,
@@ -40,24 +30,19 @@ enum Command {
         domain: String,
         #[arg(long)]
         explain: bool,
-        #[arg(long, help = "Override classification threshold (0.0-1.0)")]
+        #[arg(long)]
         threshold: Option<f32>,
     },
     Batch {
         file: PathBuf,
         #[arg(long)]
         explain: bool,
-        #[arg(long, help = "Override classification threshold (0.0-1.0)")]
+        #[arg(long)]
         threshold: Option<f32>,
     },
     Serve {
-        #[arg(long, default_value = "0.0.0.0:53")]
-        listen: String,
-        #[arg(long, default_value = "127.0.0.1:5353")]
-        upstream: String,
         #[arg(long)]
         threshold: Option<f32>,
-
     },
 }
 
@@ -77,36 +62,45 @@ fn init_logging(log_dir: &str) -> tracing_appender::non_blocking::WorkerGuard {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    let _guard = init_logging(cli.log_dir.to_str().unwrap());
+    let cfg = Config::load(&cli.config)?;
+
+    let _guard = init_logging(cfg.logging.dir.to_str().unwrap());
 
     let templar = DnsTemplar::load(
-        cli.model.to_str().unwrap(),
-        cli.threshold.to_str().unwrap(),
-        cli.ngram_table.to_str().unwrap(),
-        cli.tld_freq.to_str().unwrap(),
-        cli.whitelist.to_str().unwrap(),
-        cli.blacklist.to_str().unwrap(),
+        cfg.model.classifier.to_str().unwrap(),
+        cfg.model.threshold.to_str().unwrap(),
+        cfg.model.ngram_table.to_str().unwrap(),
+        cfg.model.tld_freq.to_str().unwrap(),
+        cfg.model.whitelist.to_str().unwrap(),
+        cfg.model.blacklist.to_str().unwrap(),
     )?;
+
+    let config_threshold = cfg.classification
+        .as_ref()
+        .and_then(|c| c.threshold_override);
 
     let _ = templar.classify("warmup.internal", None);
     tracing::info!("model warmed up");
 
     match cli.command {
         Command::Check { domain, explain, threshold } => {
-            classify_and_print(&templar, &domain, explain, threshold)?;
+            let t = threshold.or(config_threshold);
+            classify_and_print(&templar, &domain, explain, t)?;
         }
         Command::Batch { file, explain, threshold } => {
+            let t = threshold.or(config_threshold);
             let contents = std::fs::read_to_string(&file)?;
             for line in contents.lines() {
                 let domain = line.trim();
                 if !domain.is_empty() {
-                    classify_and_print(&templar, domain, explain, threshold)?;
+                    classify_and_print(&templar, domain, explain, t)?;
                 }
             }
         }
-        Command::Serve { listen, upstream, threshold } => {
+        Command::Serve { threshold } => {
+            let t = threshold.or(config_threshold);
             let templar = Arc::new(templar);
-            server::serve(&listen, &upstream, templar, threshold).await?;
+            server::serve(&cfg.server.listen, &cfg.server.upstream, templar, t).await?;
         }
     }
 
