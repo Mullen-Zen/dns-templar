@@ -52,8 +52,8 @@ The classifier operates on linguistic and structural features extracted from the
 - **Dot count / hyphen presence**
 SHAP analysis confirmed ngram_score as the dominant feature (mean |SHAP| = 3.45), with domain length and TLD frequency as secondary signals. Results visualized below.
 
-[IMAGE 1]
-[IMAGE 2]
+![IMAGE 1](contribution_graphs/shap_bar.png)
+![IMAGE 2](contribution_graphs/shap_beeswarm.png)
  
 ---
 
