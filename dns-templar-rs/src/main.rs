@@ -2,9 +2,10 @@ mod features;
 mod model;
 mod classifier;
 mod server;
+mod blacklist;
 
 use std::sync::Arc;
-use classifier::DnsTemplar;
+use classifier::{DnsTemplar, Tier};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use tracing_appender::rolling;
@@ -26,6 +27,8 @@ struct Cli {
     whitelist: PathBuf,
     #[arg(long, default_value = "../logs")]
     log_dir: PathBuf,
+    #[arg(long, default_value = "../models/blacklist.txt")]
+    blacklist: PathBuf,
 
     #[command(subcommand)]
     command: Command,
@@ -82,6 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cli.ngram_table.to_str().unwrap(),
         cli.tld_freq.to_str().unwrap(),
         cli.whitelist.to_str().unwrap(),
+        cli.blacklist.to_str().unwrap(),
     )?;
 
     let _ = templar.classify("warmup.internal", None);
@@ -115,6 +119,8 @@ fn classify_and_print(
     explain: bool,
     threshold_override: Option<f32>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    use colored::Colorize;
+
     let verdict = templar.classify(domain, threshold_override)?;
     
     tracing::info!(
@@ -122,16 +128,9 @@ fn classify_and_print(
         probability = verdict.probability,
         is_dga = verdict.is_dga,
         whitelisted = verdict.whitelisted,
+        tier = ?verdict.tier,
         "classified"
     );
-
-    let label = if verdict.whitelisted {
-        "SAFE "
-    } else if verdict.is_dga {
-        "DGA"
-    } else {
-        "LEGIT"
-    };
     
     let prob_str = if verdict.whitelisted {
         " -- ".to_string()
@@ -139,10 +138,23 @@ fn classify_and_print(
         format!("{:.1}%", verdict.probability * 100.0)
     };
 
-    println!("[{label}] {prob_str}  {}", verdict.domain);
+    let line = match verdict.tier {
+        Tier::Blacklisted =>
+            format!("[BLACKLISTED]      {prob_str}  {}", verdict.domain).red().bold().to_string(),
+        Tier::HighConfidence => 
+            format!("[DGA LIKELY]       {prob_str}  {}", verdict.domain).red().to_string(),
+        Tier::Suspicious => 
+            format!("[DGA SUSPECTED]    {prob_str}  {}", verdict.domain).yellow().to_string(),
+        Tier::Whitelisted =>
+            format!("[WHITELISTED]      {prob_str}  {}", verdict.domain).green().to_string(),
+        Tier::Clean =>
+            format!("[CLEAN]            {prob_str}  {}", verdict.domain).green().to_string(),
+    };
+
+    println!("{line}");
 
     if explain && !verdict.whitelisted {
-        println!("  Feature contributions:");
+        println!("Feature contributions:");
         for (name, value) in &verdict.features {
             println!("      {:<25} {:.6}", name, value);
         }

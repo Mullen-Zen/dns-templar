@@ -6,12 +6,23 @@ use crate::features::{
 };
 use crate::model::Classifier;
 use std::collections::HashSet;
+use crate::blacklist::Blacklist;
 
 pub struct DnsTemplar {
     classifier: Classifier,
     ngram_table: NgramTable,
     tld_freq: TldFreqMap,
     whitelist: HashSet<String>,
+    blacklist: Blacklist,
+}
+
+#[derive(Debug)]
+pub enum Tier {
+    Whitelisted,
+    Blacklisted,
+    HighConfidence,
+    Suspicious,
+    Clean,
 }
 
 pub struct Verdict {
@@ -19,6 +30,7 @@ pub struct Verdict {
     pub probability: f32,
     pub is_dga: bool,
     pub whitelisted: bool,
+    pub tier: Tier,
     pub features: Vec<(&'static str, f64)>,
 }
 
@@ -29,6 +41,7 @@ impl DnsTemplar {
         ngram_path: &str,
         tld_freq_path: &str,
         whitelist_path: &str,
+        blacklist_path: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let classifier = Classifier::load(model_path, threshold_path)?;
         let ngram_table = load_ngram_table(ngram_path)?;
@@ -42,7 +55,9 @@ impl DnsTemplar {
             .collect();
         println!("Loaded {} whitelisted domains", whitelist.len());
 
-        Ok(Self { classifier, ngram_table, tld_freq, whitelist })
+        let blacklist = Blacklist::load(blacklist_path)?;
+
+        Ok(Self { classifier, ngram_table, tld_freq, whitelist, blacklist })
     }
 
     pub fn classify(&self, domain: &str, threshold_override: Option<f32>) -> Result<Verdict, Box<dyn std::error::Error>> {
@@ -54,6 +69,18 @@ impl DnsTemplar {
                 probability: 0.0,
                 is_dga: false,
                 whitelisted: true,
+                tier: Tier::Whitelisted,
+                features: vec![],
+            });
+        }
+
+        if self.blacklist.contains(&domain_lower) {
+            return Ok(Verdict {
+                domain: domain.to_string(),
+                probability: 1.0,
+                is_dga: true,
+                whitelisted: false,
+                tier: Tier::Blacklisted,
                 features: vec![],
             });
         }
@@ -84,11 +111,20 @@ impl DnsTemplar {
         let threshold = threshold_override.unwrap_or(self.classifier.threshold);
         let is_dga = probability >= threshold;
     
+        let tier = if is_dga && probability >= 0.85 {
+            Tier::HighConfidence
+        } else if is_dga {
+            Tier::Suspicious
+        } else {
+            Tier::Clean
+        };
+
         Ok(Verdict {
             domain: domain.to_string(),
             probability,
             is_dga,
             whitelisted: false,
+            tier,
             features,
         })
     }

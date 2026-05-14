@@ -56,6 +56,7 @@ async fn handle_query(
         probability = verdict.probability,
         is_dga = verdict.is_dga,
         whitelisted = verdict.whitelisted,
+        tier = ?verdict.tier,
         "classified"
     );
 

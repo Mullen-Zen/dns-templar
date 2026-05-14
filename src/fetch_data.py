@@ -46,6 +46,18 @@ def fetch_whitelist(output_path="../models/whitelist.txt", limit=50_000):
         out.write("\n".join(domains))
     print(f"Saved {len(domains)} whitelisted domains to {output_path}")
 
+def save_blacklist(
+    data_path="../data/raw/domains.csv",
+    output_path="../models/blacklist.txt"
+):
+    print("Building blacklist from DGA training data...")
+    df = pd.read_csv(data_path)
+    dga_domains = df[df["type"] == "dga"]["domain"].str.lower().tolist()
+    with open(output_path, "w") as f:
+        f.write("\n".join(dga_domains))
+    print(f"Saved {len(dga_domains)} known DGA domains to {output_path}")
+
 if __name__ == "__main__":
     fetch_dataset()
     fetch_whitelist()
+    save_blacklist()
