@@ -4,7 +4,10 @@ data/
 outputs/
 
 # Models
-models/
+models/classifier.onnx
+models/classifier.json
+models/whitelist.txt
+models/blacklist.txt
 
 # Logs
 logs/
