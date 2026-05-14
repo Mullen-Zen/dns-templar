@@ -1,7 +1,7 @@
 use tract_onnx::prelude::*;
 use std::fs;
-use serde_json;
 
+#[allow(clippy::type_complexity)]
 pub struct Classifier {
     model: SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>,
     pub threshold: f32,
