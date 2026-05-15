@@ -7,6 +7,9 @@ use crate::features::{
 use crate::model::Classifier;
 use std::collections::HashSet;
 use crate::blacklist::Blacklist;
+use lru::LruCache;
+use std::num::NonZeroUsize;
+use std::sync::Mutex;
 
 pub struct DnsTemplar {
     classifier: Classifier,
@@ -14,9 +17,10 @@ pub struct DnsTemplar {
     tld_freq: TldFreqMap,
     whitelist: HashSet<String>,
     blacklist: Blacklist,
+    cache: Mutex<LruCache<String, Verdict>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Tier {
     Whitelisted,
     Blacklisted,
@@ -25,6 +29,7 @@ pub enum Tier {
     Clean,
 }
 
+#[derive(Clone)]
 pub struct Verdict {
     pub domain: String,
     pub probability: f32,
@@ -57,12 +62,28 @@ impl DnsTemplar {
 
         let blacklist = Blacklist::load(blacklist_path)?;
 
-        Ok(Self { classifier, ngram_table, tld_freq, whitelist, blacklist })
+        let cache = Mutex::new(LruCache::new(NonZeroUsize::new(4096).unwrap()));
+
+        Ok(Self { classifier, ngram_table, tld_freq, whitelist, blacklist, cache })
     }
 
     pub fn classify(&self, domain: &str, threshold_override: Option<f32>) -> Result<Verdict, Box<dyn std::error::Error>> {
         let domain_lower = domain.trim_end_matches('.').to_lowercase();
         
+        {
+            let mut cache = self.cache.lock().unwrap();
+            if let Some(cached) = cache.get(&domain_lower) {
+                tracing::info!(
+                    domain = %domain_lower,
+                    "cache hit!"
+                );
+                return Ok(Verdict {
+                    domain: domain.to_string(),
+                    ..cached.clone()
+                });
+            }
+        }
+
         if self.whitelist.contains(&domain_lower) {
             return Ok(Verdict {
                 domain: domain.to_string(),
@@ -119,13 +140,20 @@ impl DnsTemplar {
             Tier::Clean
         };
 
-        Ok(Verdict {
+        let verdict = Verdict {
             domain: domain.to_string(),
             probability,
             is_dga,
             whitelisted: false,
             tier,
             features,
-        })
+        };
+
+        {
+            let mut cache = self.cache.lock().unwrap();
+            cache.put(domain_lower, verdict.clone());
+        }
+
+        Ok(verdict)
     }
 }
