@@ -62,7 +62,7 @@ impl DnsTemplar {
 
         let blacklist = Blacklist::load(blacklist_path)?;
 
-        let cache = Mutex::new(LruCache::new(NonZeroUsize::new(4096).unwrap()));
+        let cache = Mutex::new(LruCache::new(NonZeroUsize::new(65536).unwrap()));
 
         Ok(Self { classifier, ngram_table, tld_freq, whitelist, blacklist, cache })
     }
