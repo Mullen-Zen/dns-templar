@@ -1,5 +1,6 @@
 use tract_onnx::prelude::*;
 use std::fs;
+use std::time::Instant;
 
 #[allow(clippy::type_complexity)]
 pub struct Classifier {
@@ -35,7 +36,9 @@ impl Classifier {
         )?
         .into();
 
+        let t = Instant::now();
         let result = self.model.run(tvec!(input.into()))?;
+        tracing::info!(onnx_ms = t.elapsed().as_millis(), "onnx inference");
 
         let probs = result[1].to_array_view::<f32>()?;
         let dga_prob = probs[[0, 1]];

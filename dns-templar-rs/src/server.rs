@@ -1,6 +1,8 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::UdpSocket;
+use tokio::time::timeout;
 use hickory_proto::op::{Message};
 use hickory_proto::serialize::binary::{BinDecodable};
 
@@ -48,8 +50,13 @@ async fn handle_query(
     };
 
     let templar = Arc::clone(templar);
-    let verdict = templar.classify(&domain, threshold)
-        .map_err(|e| e.to_string())?;
+    let verdict = tokio::task::spawn_blocking(move || {
+        templar.classify(&domain, threshold)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
 
     tracing::info!(
         domain = %verdict.domain,
@@ -71,10 +78,10 @@ async fn handle_query(
         // tracing::info!("forwarding to upstream");
         let upstream_sock = UdpSocket::bind("0.0.0.0:0").await?;
         upstream_sock.send_to(raw, upstream).await?;
-        // tracing::info!("sent to upstream, awaiting response");
         let mut resp_buf = [0u8; 4096];
-        let (resp_len, _) = upstream_sock.recv_from(&mut resp_buf).await?;
-        // tracing::info!("got response, relaying to client");
+        let (resp_len, _) = timeout(Duration::from_secs(2), upstream_sock.recv_from(&mut resp_buf))
+            .await
+            .map_err(|_| format!("upstream {upstream} timed out"))??;
         socket.send_to(&resp_buf[..resp_len], src).await?;
     }
 
